@@ -2,6 +2,8 @@ from typing import Optional
 
 import pandas as pd
 from typing import List
+
+import torch
 from sklearn.model_selection import train_test_split
 
 from transformers import AutoTokenizer
@@ -34,7 +36,7 @@ class CustomDataset(Dataset):
             self.dataset.append(tokenized_inputs)
 
     def __len__(self):
-        len(self.dataset)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
         item = self.dataset[idx]
@@ -42,7 +44,8 @@ class CustomDataset(Dataset):
         attention_mask = item['attention_mask']
         labels = item['labels']
 
-        return input_ids, attention_mask, labels
+        # return input_ids, attention_mask, labels
+        return item
 
     def _tokenize_and_align_labels(self, data_point: List[str]):
         word_list = [word.split(' ')[0] for word in data_point]
@@ -71,7 +74,9 @@ class CustomDataset(Dataset):
                 label_ids.append(self.tag2id[label_list[word_idx]] if self.label_all_tokens else -100)
             previous_word_idx = word_idx
 
-        tokenized_inputs["labels"] = label_ids
+        tokenized_inputs["labels"] = torch.LongTensor(label_ids)
+        tokenized_inputs['input_ids'] = torch.LongTensor(tokenized_inputs['input_ids'])
+        tokenized_inputs['attention_mask'] = torch.LongTensor(tokenized_inputs['attention_mask'])
         return tokenized_inputs
 
 
@@ -97,6 +102,7 @@ class NERDataModule(LightningDataModule):
         self.model_name_or_path = model_name_or_path
         self.dataset_path = dataset_path
         self.tags_list = tags_list
+        self.num_labels = len(tags_list)
 
         self.val_size = val_size
         self.test_size = test_size
@@ -159,10 +165,10 @@ class NERDataModule(LightningDataModule):
 
 
 if __name__ == '__main__':
-    # ner_dataset = NERDataSet(jsonl_file='dataset/all_data_v1_02t03.jsonl')
-    # dataset_df = ner_dataset.dataset_df
+    from dataset import NERDataModule
 
-    model = 'xlm-roberta-base'
+    # seed_everything(43)
+
     tags_list = ["B-ADDRESS", "I-ADDRESS",
                  "B-SKILL", "I-SKILL",
                  "B-EMAIL", "I-EMAIL",
@@ -179,10 +185,13 @@ if __name__ == '__main__':
                  "B-EVENT", "I-EVENT",
                  "B-URL", "I-URL"]
 
-    print(tags_list)
-    max_seq_length = 128
-    datamodule = NERDataModule(model_name_or_path=model,
-                               dataset_path='dataset/all_data_v1_02t03.jsonl',
-                               tags_list=tags_list,
-                               max_seq_length=128)
-    train_dataloader = datamodule.train_dataloader()
+    # mlflow.pytorch.autolog(log_every_n_epoch=1)
+
+    dm = NERDataModule(model_name_or_path='xlm-roberta-base',
+                       dataset_path='dataset/all_data_v1_02t03.jsonl',
+                       tags_list=tags_list,
+                       max_seq_length=128,
+                       train_batch_size=32,
+                       eval_batch_size=32)
+    dm.setup(stage="fit")
+    print(1)
