@@ -4,10 +4,9 @@ import pandas as pd
 from typing import List
 from sklearn.model_selection import train_test_split
 
-from pytorch_lightning.utilities.types import EVAL_DATALOADERS
 from transformers import AutoTokenizer
 from pytorch_lightning.core import LightningDataModule
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from utils.dataset import NERDataSet
 
@@ -23,7 +22,7 @@ class CustomDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.label_all_tokens = label_all_tokens
 
-        self.tokenzier = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
         self.tag2id = {}
         for i in range(len(tags_list)):
             self.tag2id[tags_list[i]] = i
@@ -112,6 +111,10 @@ class NERDataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         ner_dataset = NERDataSet(jsonl_file=self.dataset_path)
         self.dataset_df = ner_dataset.dataset_df
+
+        # TODO
+        # Write to conll format file
+        # train, val, test split
         df_train, df_rest = train_test_split(self.dataset_df,
                                              shuffle=True,
                                              random_state=43,
@@ -143,26 +146,26 @@ class NERDataModule(LightningDataModule):
                                        label_all_tokens=True)
 
     def train_dataloader(self):
-        pass
+        return DataLoader(self.train_data, batch_size=self.train_batch_size)
 
     def val_dataloader(self):
-        pass
+        return DataLoader(self.val_data, batch_size=self.eval_batch_size)
 
     def test_dataloader(self):
+        return DataLoader(self.test_data, batch_size=self.eval_batch_size)
+
+    def predict_dataloader(self):
         pass
 
-    def predict_dataloader(self) -> EVAL_DATALOADERS:
-        pass
 
-
-if __name__ == '__main__ ':
-    ner_dataset = NERDataSet(jsonl_file='dataset/all_data_v1_02t03.jsonl')
-    dataset_df = ner_dataset.dataset_df
+if __name__ == '__main__':
+    # ner_dataset = NERDataSet(jsonl_file='dataset/all_data_v1_02t03.jsonl')
+    # dataset_df = ner_dataset.dataset_df
 
     model = 'xlm-roberta-base'
-    tags_list = ["B-ADDRESS", "I-ADDRESS"
-                 "B-SKIILL", "I-SKILL",
-                 "B-EMAL", "I-EMAL",
+    tags_list = ["B-ADDRESS", "I-ADDRESS",
+                 "B-SKILL", "I-SKILL",
+                 "B-EMAIL", "I-EMAIL",
                  "B-PERSON", "I-PERSON",
                  "B-PHONENUMBER", "I-PHONENUMBER",
                  "B-QUANTITY", "I-QUANTITY",
@@ -176,9 +179,10 @@ if __name__ == '__main__ ':
                  "B-EVENT", "I-EVENT",
                  "B-URL", "I-URL"]
 
-
-    dataset = CustomDataset(df=dataset_df,
-                            model_name_or_path=self.model_name_or_path,
-                            tags_list=self.tags_list,
-                            max_seq_length=self.max_seq_length,
-                            label_all_tokens=True)
+    print(tags_list)
+    max_seq_length = 128
+    datamodule = NERDataModule(model_name_or_path=model,
+                               dataset_path='dataset/all_data_v1_02t03.jsonl',
+                               tags_list=tags_list,
+                               max_seq_length=128)
+    train_dataloader = datamodule.train_dataloader()
