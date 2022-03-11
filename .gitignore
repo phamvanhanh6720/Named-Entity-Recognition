@@ -1,8 +1,9 @@
 dataset
 **/*.pyc
-test_tokenize.ipynb
-Token_Classification.ipynb
+notebook/test_tokenize.ipynb
+notebook/Token_Classification.ipynb
 mlruns
 lightning_logs
-test_tokenize.ipynb
+notebook/test_tokenize.ipynb
+notebook
 .idea
