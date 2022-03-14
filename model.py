@@ -46,6 +46,8 @@ class NERModel(LightningModule):
     def training_step(self, batch, batch_idx):
         outputs = self(**batch)
         loss = outputs[0]
+        self.log("train_loss", loss, prog_bar=True)
+
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
@@ -90,9 +92,9 @@ class NERModel(LightningModule):
             if 'overall' in key:
                 refactor_results['val_' + key] = results[key]
             else:
-                refactor_results[key] = results[key]
+                refactor_results['val_' + key + '_f1'] = results[key]['f1']
 
-        self.log_dict(refactor_results, prog_bar=True)
+        self.log_dict(refactor_results)
 
         return loss
 
@@ -130,46 +132,3 @@ class NERModel(LightningModule):
         )
         scheduler = {"scheduler": scheduler, "interval": "step", "frequency": 1}
         return [optimizer], [scheduler]
-
-
-if __name__ == '__main__':
-    from dataset import NERDataModule
-
-    seed_everything(43)
-
-    tags_list = ["B-ADDRESS", "I-ADDRESS",
-                 "B-SKILL", "I-SKILL",
-                 "B-EMAIL", "I-EMAIL",
-                 "B-PERSON", "I-PERSON",
-                 "B-PHONENUMBER", "I-PHONENUMBER",
-                 "B-QUANTITY", "I-QUANTITY",
-                 "B-PERSONTYPE", "I-PERSONTYPE",
-                 "B-ORGANIZATION", "I-ORGANIZATION",
-                 "B-PRODUCT", "I-PRODUCT",
-                 "B-IP", 'I-IP',
-                 "B-LOCATION", "I-LOCATION",
-                 "O",
-                 "B-DATETIME", "I-DATETIME",
-                 "B-EVENT", "I-EVENT",
-                 "B-URL", "I-URL"]
-
-    mlflow.pytorch.autolog(log_every_n_epoch=1)
-
-    dm = NERDataModule(model_name_or_path='xlm-roberta-base',
-                       dataset_path='dataset/all_data_v1_02t03.jsonl',
-                       tags_list=tags_list,
-                       max_seq_length=64,
-                       train_batch_size=4,
-                       eval_batch_size=4)
-    dm.setup(stage="fit")
-
-    model = NERModel(model_name_or_path="xlm-roberta-base",
-                     num_labels=dm.num_labels,
-                     tags_list=dm.tags_list,
-                     train_batch_size=4,
-                     eval_batch_size=4)
-
-    AVAIL_GPUS = min(1, torch.cuda.device_count())
-
-    trainer = Trainer(max_epochs=3, gpus=AVAIL_GPUS)
-    trainer.fit(model, datamodule=dm)

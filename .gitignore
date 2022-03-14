@@ -7,3 +7,5 @@ lightning_logs
 notebook/test_tokenize.ipynb
 notebook
 .idea
+.idea/NER_VLSP2021.iml
+.idea/*

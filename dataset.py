@@ -86,6 +86,7 @@ class NERDataModule(LightningDataModule):
                  model_name_or_path: str,
                  dataset_path: str,
                  tags_list: List[str],
+                 label_all_tokens: bool = False,
                  max_seq_length: int = 128,
                  train_batch_size: int = 32,
                  eval_batch_size: int = 32,
@@ -103,6 +104,7 @@ class NERDataModule(LightningDataModule):
         self.dataset_path = dataset_path
         self.tags_list = tags_list
         self.num_labels = len(tags_list)
+        self.label_all_tokens = label_all_tokens
 
         self.val_size = val_size
         self.test_size = test_size
@@ -137,19 +139,19 @@ class NERDataModule(LightningDataModule):
                                         model_name_or_path=self.model_name_or_path,
                                         tags_list=self.tags_list,
                                         max_seq_length=self.max_seq_length,
-                                        label_all_tokens=True)
+                                        label_all_tokens=self.label_all_tokens)
 
         self.val_data = CustomDataset(df=df_val,
                                       model_name_or_path=self.model_name_or_path,
                                       tags_list=self.tags_list,
                                       max_seq_length=self.max_seq_length,
-                                      label_all_tokens=True)
+                                      label_all_tokens=self.label_all_tokens)
 
         self.test_data = CustomDataset(df=df_test,
                                        model_name_or_path=self.model_name_or_path,
                                        tags_list=self.tags_list,
                                        max_seq_length=self.max_seq_length,
-                                       label_all_tokens=True)
+                                       label_all_tokens=self.label_all_tokens)
 
     def train_dataloader(self):
         return DataLoader(self.train_data, batch_size=self.train_batch_size)
