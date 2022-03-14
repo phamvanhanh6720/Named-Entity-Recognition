@@ -39,12 +39,8 @@ class CustomDataset(Dataset):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        item = self.dataset[idx]
-        input_ids = item['input_ids']
-        attention_mask = item['attention_mask']
-        labels = item['labels']
+        item: dict = self.dataset[idx]
 
-        # return input_ids, attention_mask, labels
         return item
 
     def _tokenize_and_align_labels(self, data_point: List[str]):
@@ -99,6 +95,7 @@ class NERDataModule(LightningDataModule):
         self.train_data = None
         self.dataset_df = None
         self.test_data = None
+        self.save_hyperparameters(ignore=['model_name_or_path', 'tags_list', 'test_size', 'val_size'])
 
         self.model_name_or_path = model_name_or_path
         self.dataset_path = dataset_path
@@ -196,4 +193,3 @@ if __name__ == '__main__':
                        train_batch_size=32,
                        eval_batch_size=32)
     dm.setup(stage="fit")
-    print(1)

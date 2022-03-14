@@ -1,16 +1,12 @@
-from datetime import datetime
-from typing import Optional, List
+from typing import List
 
 import torch
 import datasets
-import mlflow.pytorch
-from pytorch_lightning import LightningModule, Trainer, seed_everything
-from torch.utils.data import DataLoader
+from pytorch_lightning import LightningModule
 from transformers import (
     AdamW,
     AutoConfig,
     AutoModelForTokenClassification,
-    AutoTokenizer,
     get_linear_schedule_with_warmup,
 )
 
@@ -28,7 +24,6 @@ class NERModel(LightningModule):
         weight_decay: float = 0.0,
         train_batch_size: int = 32,
         eval_batch_size: int = 32,
-        eval_splits: Optional[list] = None,
         **kwargs,
     ):
         super().__init__()
