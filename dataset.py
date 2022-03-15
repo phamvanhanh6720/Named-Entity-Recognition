@@ -1,4 +1,5 @@
 import os
+import ast
 from typing import Optional
 
 import pandas as pd
@@ -137,7 +138,7 @@ class NERDataModule(LightningDataModule):
         pass
 
     @staticmethod
-    def prepare__dataset(
+    def prepare_dataset(
             merge_sentence: Optional[int],
             val_size: float,
             test_size:float,
@@ -145,43 +146,46 @@ class NERDataModule(LightningDataModule):
             output_dir: str,
             data_format: str):
 
+        dataset_df = None
         if data_format == 'doccano':
             ner_dataset = NERDataSet(jsonl_file=dataset_path)
             dataset_df = ner_dataset.dataset_df
+        elif data_format == 'csv':
+            dataset_df = pd.read_csv(dataset_path)
+            dataset_df['conll_label'] = dataset_df['conll_label'].map(lambda x: ast.literal_eval(x))
 
-            if merge_sentence is not None:
-                new_dataset = []
-                for start_idx in range(0, len(dataset_df), merge_sentence)[:-1]:
-                    main_source = dataset_df.iloc[start_idx:start_idx+merge_sentence]['source'].value_counts(
-                        dropna=False).index[0]
+        if merge_sentence is not None:
+            new_dataset = []
+            for start_idx in range(0, len(dataset_df), merge_sentence)[:-1]:
+                main_source = dataset_df.iloc[start_idx:start_idx+merge_sentence]['source'].value_counts(
+                    dropna=False).index[0]
 
-                    new_conll_label = []
-                    for conll_label in list(dataset_df.iloc[start_idx:start_idx+merge_sentence]['conll_label'].values):
-                        new_conll_label.extend(conll_label)
+                new_conll_label = []
+                for conll_label in list(dataset_df.iloc[start_idx:start_idx+merge_sentence]['conll_label'].values):
+                    new_conll_label.extend(conll_label)
 
-                    new_dataset.append([main_source, new_conll_label])
+                new_dataset.append([main_source, new_conll_label])
 
-                dataset_df = pd.DataFrame(data=new_dataset, columns=['source', 'conll_label'])
+            dataset_df = pd.DataFrame(data=new_dataset, columns=['source', 'conll_label'])
 
-            df_train, df_rest = train_test_split(dataset_df,
-                                                 shuffle=True,
-                                                 random_state=43,
-                                                 stratify=dataset_df[['source']],
-                                                 train_size=1 - val_size - test_size)
+        dataset_df['source'].fillna('other', inplace=True)
 
-            df_val, df_test = train_test_split(df_rest,
-                                               shuffle=True,
-                                               random_state=43,
-                                               stratify=df_rest[['source']],
-                                               train_size=val_size / (val_size + test_size))
+        df_train, df_rest = train_test_split(dataset_df,
+                                             shuffle=True,
+                                             random_state=43,
+                                             stratify=dataset_df[['source']],
+                                             train_size=1 - val_size - test_size)
 
-            # Write to file
-            NERDataModule.write_to_file(df_data=df_train, output_dir=output_dir, filename='train_data.txt')
-            NERDataModule.write_to_file(df_data=df_val, output_dir=output_dir, filename='val_data.txt')
-            NERDataModule.write_to_file(df_data=df_test, output_dir=output_dir, filename='test_data.txt')
+        df_val, df_test = train_test_split(df_rest,
+                                           shuffle=True,
+                                           random_state=43,
+                                           stratify=df_rest[['source']],
+                                           train_size=val_size / (val_size + test_size))
 
-        elif data_format == 'pickle':
-            pass
+        # Write to file
+        NERDataModule.write_to_file(df_data=df_train, output_dir=output_dir, filename='train_data.txt')
+        NERDataModule.write_to_file(df_data=df_val, output_dir=output_dir, filename='val_data.txt')
+        NERDataModule.write_to_file(df_data=df_test, output_dir=output_dir, filename='test_data.txt')
 
     @staticmethod
     def write_to_file(df_data, output_dir, filename):
@@ -256,14 +260,14 @@ if __name__ == '__main__':
     # mlflow.pytorch.autolog(log_every_n_epoch=1)
 
     dm = NERDataModule(model_name_or_path='xlm-roberta-base',
-                       dataset_path='dataset/all_data_v1_02t03.jsonl',
+                       dataset_version='version3_dont_merge',
                        tags_list=tags_list,
                        max_seq_length=128,
                        train_batch_size=32,
                        eval_batch_size=32)
-    dm.prepare_data(merge_sentence=None,
+    dm.prepare_dataset(merge_sentence=None,
                     val_size=0.2,
                     test_size=0.1,
-                    dataset_path='origin_dataset/all_data_v1_06t03.jsonl',
-                    output_dir='dataset/version2_dont_merge',
-                    data_format='doccano')
+                    dataset_path='origin_dataset/final_v2_09t03_hanh.csv',
+                    output_dir='dataset/version3_dont_merge',
+                    data_format='csv')
