@@ -6,4 +6,7 @@ mlruns
 lightning_logs
 notebook/test_tokenize.ipynb
 notebook
-.idea
+.ideagit
+all_v1_09t03.pkl
+test_data_format.ipynb
+origin_dataset/all_data_v1_02t03.jsonl

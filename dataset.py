@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 
 import pandas as pd
@@ -110,8 +111,63 @@ class NERDataModule(LightningDataModule):
         self.train_batch_size = train_batch_size
         self.eval_batch_size = eval_batch_size
 
-    def prepare_data(self):
-        pass
+    @staticmethod
+    def prepare_data(merge_sentence: Optional[int],
+                     val_size: float,
+                     test_size:float,
+                     dataset_path: str,
+                     output_dir: str,
+                     data_format: str):
+        if data_format == 'doccano':
+            ner_dataset = NERDataSet(jsonl_file=dataset_path)
+            dataset_df = ner_dataset.dataset_df
+
+            if merge_sentence is not None:
+                new_dataset = []
+                for start_idx in range(0, len(dataset_df), merge_sentence)[:-1]:
+                    main_source = dataset_df.iloc[start_idx:start_idx+merge_sentence]['source'].value_counts(
+                        dropna=False).index[0]
+
+                    new_conll_label = []
+                    for conll_label in list(dataset_df.iloc[start_idx:start_idx+merge_sentence]['conll_label'].values):
+                        new_conll_label.extend(conll_label)
+
+                    new_dataset.append([main_source, new_conll_label])
+
+                dataset_df = pd.DataFrame(data=new_dataset, columns=['source', 'conll_label'])
+
+            df_train, df_rest = train_test_split(dataset_df,
+                                                 shuffle=True,
+                                                 random_state=43,
+                                                 stratify=dataset_df[['source']],
+                                                 train_size=1 - val_size - test_size)
+
+            df_val, df_test = train_test_split(df_rest,
+                                               shuffle=True,
+                                               random_state=43,
+                                               stratify=df_rest[['source']],
+                                               train_size=val_size / (val_size + test_size))
+
+            # Write to file
+            NERDataModule.write_to_file(df_data=df_train, output_dir=output_dir, filename='train_data.txt')
+            NERDataModule.write_to_file(df_data=df_val, output_dir=output_dir, filename='val_data.txt')
+            NERDataModule.write_to_file(df_data=df_test, output_dir=output_dir, filename='test_data.txt')
+
+        elif data_format == 'pickle':
+            pass
+
+    @staticmethod
+    def write_to_file(df_data, output_dir, filename):
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
+
+        with open(os.path.join(output_dir, filename), 'w') as file:
+            for i in range(len(df_data)):
+                item = df_data.iloc[i]
+                conll_label = item['conll_label']
+
+                file.write('\n'.join(conll_label))
+                file.write('\n')
 
     def setup(self, stage: Optional[str] = None):
         ner_dataset = NERDataSet(jsonl_file=self.dataset_path)
@@ -192,4 +248,9 @@ if __name__ == '__main__':
                        max_seq_length=128,
                        train_batch_size=32,
                        eval_batch_size=32)
-    dm.setup(stage="fit")
+    dm.prepare_data(merge_sentence=None,
+                    val_size=0.2,
+                    test_size=0.1,
+                    dataset_path='origin_dataset/all_data_v1_02t03.jsonl',
+                    output_dir='dataset/version1_dont_merge',
+                    data_format='doccano')

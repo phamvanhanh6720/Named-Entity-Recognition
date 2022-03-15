@@ -34,12 +34,15 @@ if __name__ == '__main__':
                  "B-URL", "I-URL"]
 
     parser = ArgumentParser()
+    parser.add_argument('--run_name', type=str, required=True)
+
     parser.add_argument('--model_name_or_path', type=str, default='xlm-roberta-base')
     parser.add_argument('--dataset_path', type=str, default='dataset/all_data_v1_02t03.jsonl')
     parser.add_argument('--label_all_tokens', type=bool, default=False)
     parser.add_argument('--max_seq_length', type=int, default=128)
     parser.add_argument('--train_batch_size', type=int, default=32)
     parser.add_argument('--eval_batch_size', type=int, default=32)
+    parser.add_argument('--num_epochs', type=int, default=15)
 
     # model specific arguments
     parser.add_argument('--use_crf', type=bool, default=False)
@@ -50,7 +53,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     # mlflow.pytorch.autolog()
-    mlf_logger = MLFlowLogger(experiment_name="lightning_logs", tracking_uri="file:./mlruns")
+    mlf_logger = MLFlowLogger(experiment_name="fpt_ner_logs",
+                              tracking_uri="file:./mlruns",
+                              run_name=parser.run_name)
 
     dm = NERDataModule(model_name_or_path=args.model_name_or_path,
                        dataset_path=args.dataset_path,
@@ -74,5 +79,5 @@ if __name__ == '__main__':
 
     AVAIL_GPUS = min(1, torch.cuda.device_count())
 
-    trainer = Trainer(max_epochs=15, gpus=AVAIL_GPUS, logger=mlf_logger)
+    trainer = Trainer(max_epochs=args.num_epochs, gpus=AVAIL_GPUS, logger=mlf_logger)
     trainer.fit(model, datamodule=dm)
