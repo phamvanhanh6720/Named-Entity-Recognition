@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any, Optional
 
 import torch
 import datasets
@@ -46,8 +46,10 @@ class NERModel(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
+
         outputs = self(**batch)
         val_loss, logits = outputs[:2]
+        preds = None
 
         if self.hparams.num_labels >= 1:
             preds = torch.argmax(logits, axis=-1)
@@ -57,6 +59,47 @@ class NERModel(LightningModule):
         labels = batch["labels"]
 
         return {"loss": val_loss, "preds": preds, "labels": labels}
+
+    def test_step(self, batch, batch_idx) -> Optional:
+        outputs = self(**batch)
+        val_loss, logits = outputs[:2]
+        preds = None
+
+        if self.hparams.num_labels >= 1:
+            preds = torch.argmax(logits, axis=-1)
+        elif self.hparams.num_labels == 1:
+            preds = logits.squeeze()
+
+        labels = batch["labels"]
+
+        return {"loss": val_loss, "preds": preds, "labels": labels}
+
+    def test_epoch_end(self, outputs) -> None:
+
+        predictions = []
+        labels = []
+        for x in outputs:
+            predictions.extend(x['preds'].detach().cpu().numpy().tolist())
+            labels.extend(x['labels'].detach().cpu().numpy().tolist())
+
+        true_predictions = [
+            [self.tags_list[p] for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        true_labels = [
+            [self.tags_list[l] for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+
+        results = self.metrics.compute(predictions=true_predictions, references=true_labels)
+        refactor_results = {}
+        for key in results.keys():
+            if 'overall' in key:
+                refactor_results['test_' + key] = results[key]
+            else:
+                refactor_results['test_' + key + '_f1'] = results[key]['f1']
+
+        self.log_dict(refactor_results)
 
     def validation_epoch_end(self, outputs):
 

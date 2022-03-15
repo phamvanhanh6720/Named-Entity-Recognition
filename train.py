@@ -4,7 +4,8 @@ import torch
 import mlflow.pytorch
 from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.loggers import MLFlowLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, Callback
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from model import NERModel
 from dataset import NERDataModule
@@ -38,7 +39,7 @@ if __name__ == '__main__':
     parser.add_argument('--run_name', type=str, required=True)
 
     parser.add_argument('--model_name_or_path', type=str, default='xlm-roberta-base')
-    parser.add_argument('--dataset_path', type=str, default='dataset/all_data_v1_02t03.jsonl')
+    parser.add_argument('--dataset_version', type=str, default='version1_dont_merge')
     parser.add_argument('--label_all_tokens', type=bool, default=False)
     parser.add_argument('--max_seq_length', type=int, default=128)
     parser.add_argument('--train_batch_size', type=int, default=32)
@@ -56,10 +57,10 @@ if __name__ == '__main__':
     # mlflow.pytorch.autolog()
     mlf_logger = MLFlowLogger(experiment_name="fpt_ner_logs",
                               tracking_uri="file:./mlruns",
-                              run_name=parser.run_name)
+                              run_name=args.run_name)
 
     dm = NERDataModule(model_name_or_path=args.model_name_or_path,
-                       dataset_path=args.dataset_path,
+                       dataset_version=args.dataset_version,
                        tags_list=tags_list,
                        label_all_tokens=args.label_all_tokens,
                        max_seq_length=args.max_seq_length,
@@ -71,9 +72,11 @@ if __name__ == '__main__':
         monitor='val_overall_f1',
         dirpath='checkpoints/' + args.run_name,
         filename='{epoch:02d}--{val_overall_f1:.2f}',
-        save_top_k=3,
+        save_top_k=2,
         mode="max",
         save_weights_only=True)
+
+    early_stop_callback = EarlyStopping(monitor='val_overall_f1', patience=5, verbose=True, mode='max')
 
     model = NERModel(model_name_or_path=dm.model_name_or_path,
                      num_labels=dm.num_labels,
@@ -88,7 +91,16 @@ if __name__ == '__main__':
 
     AVAIL_GPUS = min(1, torch.cuda.device_count())
 
-    trainer = Trainer(max_epochs=args.num_epochs, gpus=AVAIL_GPUS, logger=mlf_logger)
-    trainer.fit(model, datamodule=dm)
+    trainer = Trainer(
+        max_epochs=args.num_epochs,
+        gpus=AVAIL_GPUS,
+        logger=mlf_logger,
+        callbacks=[checkpoint_callback, early_stop_callback])
+
+    trainer.fit(
+        model,
+        datamodule=dm)
 
     mlf_logger.experiment.log_artifact(mlf_logger.run_id, 'checkpoints/' + args.run_name)
+
+    trainer.test(model, datamodule=dm)

@@ -133,13 +133,18 @@ class NERDataModule(LightningDataModule):
         self.train_batch_size = train_batch_size
         self.eval_batch_size = eval_batch_size
 
+    def prepare_data(self) -> None:
+        pass
+
     @staticmethod
-    def prepare_data(merge_sentence: Optional[int],
-                     val_size: float,
-                     test_size:float,
-                     dataset_path: str,
-                     output_dir: str,
-                     data_format: str):
+    def prepare__dataset(
+            merge_sentence: Optional[int],
+            val_size: float,
+            test_size:float,
+            dataset_path: str,
+            output_dir: str,
+            data_format: str):
+
         if data_format == 'doccano':
             ner_dataset = NERDataSet(jsonl_file=dataset_path)
             dataset_df = ner_dataset.dataset_df
