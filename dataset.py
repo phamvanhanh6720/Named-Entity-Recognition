@@ -2,6 +2,7 @@ import os
 from typing import Optional
 
 import pandas as pd
+import numpy as np
 from typing import List
 
 import torch
@@ -16,7 +17,7 @@ from utils.dataset import NERDataSet
 
 class CustomDataset(Dataset):
     def __init__(self,
-                 df: pd.DataFrame,
+                 dataset_path: str,
                  model_name_or_path: str,
                  tags_list: List[str],
                  max_seq_length: int = 128,
@@ -31,10 +32,31 @@ class CustomDataset(Dataset):
             self.tag2id[tags_list[i]] = i
 
         self.dataset = []
-        for i in range(len(df)):
-            conll_format = df.iloc[i]['conll_label']
+        sen_dataset = self.read_data(dataset_path=dataset_path)
+        for i in range(len(sen_dataset)):
+            conll_format = sen_dataset[i]
             tokenized_inputs = self._tokenize_and_align_labels(data_point=conll_format)
             self.dataset.append(tokenized_inputs)
+
+    @staticmethod
+    def read_data(dataset_path: str) -> list:
+        dataset = []
+        with open(dataset_path, 'r') as file:
+            lines = file.readlines()
+
+        lines = [line.strip('\n') for line in lines]
+        break_idxs = list(np.where(np.array(lines) == '')[0])
+
+        for i in range(len(break_idxs) - 1):
+            start_idx = break_idxs[i]
+            end_idx = break_idxs[i + 1]
+
+            if start_idx != 0:
+                start_idx += 1
+
+            dataset.append(lines[start_idx: end_idx])
+
+        return dataset
 
     def __len__(self):
         return len(self.dataset)
@@ -81,7 +103,7 @@ class NERDataModule(LightningDataModule):
 
     def __init__(self,
                  model_name_or_path: str,
-                 dataset_path: str,
+                 dataset_version: str,
                  tags_list: List[str],
                  label_all_tokens: bool = False,
                  max_seq_length: int = 128,
@@ -99,7 +121,7 @@ class NERDataModule(LightningDataModule):
         self.save_hyperparameters(ignore=['model_name_or_path', 'tags_list', 'test_size', 'val_size'])
 
         self.model_name_or_path = model_name_or_path
-        self.dataset_path = dataset_path
+        self.dataset_version = dataset_version
         self.tags_list = tags_list
         self.num_labels = len(tags_list)
         self.label_all_tokens = label_all_tokens
@@ -170,41 +192,27 @@ class NERDataModule(LightningDataModule):
                 file.write('\n\n')
 
     def setup(self, stage: Optional[str] = None):
-        ner_dataset = NERDataSet(jsonl_file=self.dataset_path)
-        self.dataset_df = ner_dataset.dataset_df
 
-        # TODO
-        # Write to conll format file
-        # train, val, test split
-        df_train, df_rest = train_test_split(self.dataset_df,
-                                             shuffle=True,
-                                             random_state=43,
-                                             stratify=self.dataset_df[['source']],
-                                             train_size=1 - self.val_size - self.test_size)
+        self.train_data = CustomDataset(
+            dataset_path=os.path.join('dataset', self.dataset_version, 'train_data.txt'),
+            model_name_or_path=self.model_name_or_path,
+            tags_list=self.tags_list,
+            max_seq_length=self.max_seq_length,
+            label_all_tokens=self.label_all_tokens)
 
-        df_val, df_test = train_test_split(df_rest,
-                                           shuffle=True,
-                                           random_state=43,
-                                           stratify=df_rest[['source']],
-                                           train_size=self.val_size / (self.val_size + self.test_size))
+        self.val_data = CustomDataset(
+            dataset_path=os.path.join('dataset', self.dataset_version, 'val_data.txt'),
+            model_name_or_path=self.model_name_or_path,
+            tags_list=self.tags_list,
+            max_seq_length=self.max_seq_length,
+            label_all_tokens=self.label_all_tokens)
 
-        self.train_data = CustomDataset(df=df_train,
-                                        model_name_or_path=self.model_name_or_path,
-                                        tags_list=self.tags_list,
-                                        max_seq_length=self.max_seq_length,
-                                        label_all_tokens=self.label_all_tokens)
-
-        self.val_data = CustomDataset(df=df_val,
-                                      model_name_or_path=self.model_name_or_path,
-                                      tags_list=self.tags_list,
-                                      max_seq_length=self.max_seq_length,
-                                      label_all_tokens=self.label_all_tokens)
-
-        self.test_data = CustomDataset(df=df_test,
-                                       model_name_or_path=self.model_name_or_path,
-                                       tags_list=self.tags_list,
-                                       max_seq_length=self.max_seq_length,
-                                       label_all_tokens=self.label_all_tokens)
+        self.test_data = CustomDataset(
+            dataset_path=os.path.join('dataset', self.dataset_version, 'test_data.txt'),
+            model_name_or_path=self.model_name_or_path,
+            tags_list=self.tags_list,
+            max_seq_length=self.max_seq_length,
+            label_all_tokens=self.label_all_tokens)
 
     def train_dataloader(self):
         return DataLoader(self.train_data, batch_size=self.train_batch_size)
