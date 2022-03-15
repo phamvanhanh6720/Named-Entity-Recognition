@@ -167,7 +167,7 @@ class NERDataModule(LightningDataModule):
                 conll_label = item['conll_label']
 
                 file.write('\n'.join(conll_label))
-                file.write('\n')
+                file.write('\n\n')
 
     def setup(self, stage: Optional[str] = None):
         ner_dataset = NERDataSet(jsonl_file=self.dataset_path)
@@ -251,6 +251,6 @@ if __name__ == '__main__':
     dm.prepare_data(merge_sentence=None,
                     val_size=0.2,
                     test_size=0.1,
-                    dataset_path='origin_dataset/all_data_v1_02t03.jsonl',
-                    output_dir='dataset/version1_dont_merge',
+                    dataset_path='origin_dataset/all_data_v1_06t03.jsonl',
+                    output_dir='dataset/version2_dont_merge',
                     data_format='doccano')

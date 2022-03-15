@@ -4,6 +4,7 @@ import torch
 import mlflow.pytorch
 from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.loggers import MLFlowLogger
+from pytorch_lightning.callbacks import ModelCheckpoint, Callback
 
 from model import NERModel
 from dataset import NERDataModule
@@ -66,6 +67,14 @@ if __name__ == '__main__':
                        eval_batch_size=args.eval_batch_size)
     dm.setup(stage="fit")
 
+    checkpoint_callback = ModelCheckpoint(
+        monitor='val_overall_f1',
+        dirpath='checkpoints/' + args.run_name,
+        filename='{epoch:02d}--{val_overall_f1:.2f}',
+        save_top_k=3,
+        mode="max",
+        save_weights_only=True)
+
     model = NERModel(model_name_or_path=dm.model_name_or_path,
                      num_labels=dm.num_labels,
                      tags_list=dm.tags_list,
@@ -81,3 +90,5 @@ if __name__ == '__main__':
 
     trainer = Trainer(max_epochs=args.num_epochs, gpus=AVAIL_GPUS, logger=mlf_logger)
     trainer.fit(model, datamodule=dm)
+
+    mlf_logger.experiment.log_artifact(mlf_logger.run_id, 'checkpoints/' + args.run_name)
