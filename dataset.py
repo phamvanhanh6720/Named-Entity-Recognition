@@ -45,7 +45,8 @@ class CustomDataset(Dataset):
         with open(dataset_path, 'r') as file:
             lines = file.readlines()
 
-        lines = [line.strip('\n') for line in lines]
+        lines = [line.strip('\n').replace('\t', ' ').replace('B-MISCELLANEOUS', 'O').replace('I-MISCELLANEOUS', 'O')
+                 for line in lines]
         break_idxs = list(np.where(np.array(lines) == '')[0])
 
         for i in range(len(break_idxs) - 1):
@@ -80,6 +81,8 @@ class CustomDataset(Dataset):
 
         previous_word_idx = None
         label_ids = []
+        count = 0
+
         for word_idx in word_ids:
             # Special tokens have a word id that is None. We set the label to -100 so they are automatically
             # ignored in the loss function.
@@ -87,13 +90,22 @@ class CustomDataset(Dataset):
                 label_ids.append(-100)
             # We set the label for the first token of each word.
             elif word_idx != previous_word_idx:
-                label_ids.append(self.tag2id[label_list[word_idx]])
+                try:
+                    label_ids.append(self.tag2id[label_list[word_idx]])
+                except:
+                    count += 1
+                    label_ids.append(-100)
             # For the other tokens in a word, we set the label to either the current label or -100, depending on
             # the label_all_tokens flag.
             else:
-                label_ids.append(self.tag2id[label_list[word_idx]] if self.label_all_tokens else -100)
+                try:
+                    label_ids.append(self.tag2id[label_list[word_idx]] if self.label_all_tokens else -100)
+                except:
+                    count += 1
+                    label_ids.append(-100)
             previous_word_idx = word_idx
 
+        print('Num error tags: {}'.format(count))
         tokenized_inputs["labels"] = torch.LongTensor(label_ids)
         tokenized_inputs['input_ids'] = torch.LongTensor(tokenized_inputs['input_ids'])
         tokenized_inputs['attention_mask'] = torch.LongTensor(tokenized_inputs['attention_mask'])
@@ -265,9 +277,9 @@ if __name__ == '__main__':
                        max_seq_length=128,
                        train_batch_size=32,
                        eval_batch_size=32)
-    dm.prepare_dataset(merge_sentence=None,
+    dm.prepare_dataset(merge_sentence=3,
                     val_size=0.2,
                     test_size=0.1,
                     dataset_path='origin_dataset/final_v2_09t03_hanh.csv',
-                    output_dir='dataset/version3_dont_merge',
+                    output_dir='dataset/version3_merge3',
                     data_format='csv')
