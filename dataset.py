@@ -9,7 +9,7 @@ from typing import List
 import torch
 from sklearn.model_selection import train_test_split
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, MLukeTokenizer
 from pytorch_lightning.core import LightningDataModule
 from torch.utils.data import Dataset, DataLoader
 
@@ -27,7 +27,10 @@ class CustomDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.label_all_tokens = label_all_tokens
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
+        if 'mluke' in model_name_or_path:
+            self.tokenizer = MLukeTokenizer.from_pretrained(model_name_or_path, use_fast=True)
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=True)
         self.tag2id = {}
         for i in range(len(tags_list)):
             self.tag2id[tags_list[i]] = i
@@ -105,7 +108,7 @@ class CustomDataset(Dataset):
                     label_ids.append(-100)
             previous_word_idx = word_idx
 
-        print('Num error tags: {}'.format(count))
+        # print('Num error tags: {}'.format(count))
         tokenized_inputs["labels"] = torch.LongTensor(label_ids)
         tokenized_inputs['input_ids'] = torch.LongTensor(tokenized_inputs['input_ids'])
         tokenized_inputs['attention_mask'] = torch.LongTensor(tokenized_inputs['attention_mask'])
@@ -272,14 +275,14 @@ if __name__ == '__main__':
     # mlflow.pytorch.autolog(log_every_n_epoch=1)
 
     dm = NERDataModule(model_name_or_path='xlm-roberta-base',
-                       dataset_version='version3_dont_merge',
+                       dataset_version='version5_dont_merge',
                        tags_list=tags_list,
                        max_seq_length=128,
                        train_batch_size=32,
                        eval_batch_size=32)
-    dm.prepare_dataset(merge_sentence=3,
+    dm.prepare_dataset(merge_sentence=None,
                     val_size=0.2,
                     test_size=0.1,
-                    dataset_path='origin_dataset/final_v2_09t03_hanh.csv',
-                    output_dir='dataset/version3_merge3',
+                    dataset_path='origin_dataset/all_data_v5_15t03.csv',
+                    output_dir='dataset/version5_dont_merge',
                     data_format='csv')
