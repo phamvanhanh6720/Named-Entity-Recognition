@@ -1,3 +1,4 @@
+import time
 from argparse import ArgumentParser
 
 import torch
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--run_name', type=str, required=True)
 
     parser.add_argument('--model_name_or_path', type=str, default='xlm-roberta-base')
-    parser.add_argument('--dataset_version', type=str, default='version1_dont_merge')
+    parser.add_argument('--dataset_version', type=str, required=True)
     parser.add_argument('--label_all_tokens', type=bool, default=False)
     parser.add_argument('--max_seq_length', type=int, default=128)
     parser.add_argument('--train_batch_size', type=int, default=32)
@@ -54,10 +55,12 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.0)
 
     args = parser.parse_args()
+    run_name = args.run_name
+    run_name += '_{}'.format(time.time())
     # mlflow.pytorch.autolog()
     mlf_logger = MLFlowLogger(experiment_name="fpt_ner_logs",
                               tracking_uri="file:./mlruns",
-                              run_name=args.run_name)
+                              run_name=run_name)
 
     dm = NERDataModule(model_name_or_path=args.model_name_or_path,
                        dataset_version=args.dataset_version,
@@ -70,7 +73,7 @@ if __name__ == '__main__':
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_overall_f1',
-        dirpath='checkpoints/' + args.run_name,
+        dirpath='checkpoints/' + run_name,
         filename='{epoch:02d}--{val_overall_f1:.2f}',
         save_top_k=2,
         mode="max",
@@ -101,6 +104,6 @@ if __name__ == '__main__':
         model,
         datamodule=dm)
 
-    mlf_logger.experiment.log_artifact(mlf_logger.run_id, 'checkpoints/' + args.run_name)
+    mlf_logger.experiment.log_artifact(mlf_logger.run_id, 'checkpoints/' + run_name)
 
     trainer.test(model, datamodule=dm)

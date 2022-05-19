@@ -1,14 +1,3 @@
-dataset
+.idea/
+.DS_Store
 **/*.pyc
-notebook/test_tokenize.ipynb
-notebook/Token_Classification.ipynb
-mlruns
-lightning_logs
-notebook/test_tokenize.ipynb
-notebook
-.idea/*
-all_v1_09t03.pkl
-test_data_format.ipynb
-origin_dataset/
-.idea/workspace.xml
-reconstruct_data.ipynb

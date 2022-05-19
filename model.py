@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import List, Any, Optional
 
 import torch
@@ -11,7 +12,7 @@ from transformers import (
 )
 
 
-class NERModel(LightningModule):
+class NERModel(LightningModule, ABC):
     def __init__(
         self,
         model_name_or_path: str,

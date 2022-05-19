@@ -1,19 +1,17 @@
 import json
 import ast
+import pandas as pd
 import numpy as np
 from typing import List
-
-import pandas as pd
+from sklearn.metrics import cohen_kappa_score
 
 
 class NERDataSet:
-
     def __init__(self, jsonl_file, entity_names=[]):
-
         self.entity_names = ['PERSONTYPE', 'LOCATION', 'PHONENUMBER', 'EMAIL',
                              'PRODUCT', 'URL', 'ORGANIZATION', 'DATETIME',
                              'QUANTITY', 'ADDRESS', 'PERSON', 'SKILL',
-                             'EVENT', 'IP']
+                             'EVENT', 'MISCELLANEOUS', 'IP']
 
         self.json_list = read_annotation_file(jsonl_file=jsonl_file)
         self.all_entities = []
@@ -51,8 +49,9 @@ class NERDataSet:
             for entity in entities_list:
                 text = entity[0]
                 label = entity[1]
-                if label == 'MISCELLANEOUS':
-                    continue
+
+                if label not in self.entity_names:
+                    label = 'O'
 
                 words = text.split(' ')
                 words = [word for word in words if word != '']
@@ -79,6 +78,8 @@ class NERDataSet:
             if second_point < text_len:
                 spans_list.append(labels_list[0])
                 spans_list.append([second_point, text_len, 'O'])
+            else:
+                spans_list.append(labels_list[0])
 
             return spans_list
 
@@ -210,6 +211,47 @@ def compare_annotations(jsonl_file1, jsonl_file2):
     return id_list
 
 
-if __name__ == '__main__':
-    ner_dataset = NERDataSet(jsonl_file='../dataset/all_data_v1_02t03.jsonl')
-    print(1)
+def cal_cohen_kappa(jsonl_file1, jsonl_file2):
+    dataset1 = NERDataSet(jsonl_file=jsonl_file1)
+    dataset2 = NERDataSet(jsonl_file=jsonl_file2)
+
+    labels_dict = dataset1.labels_dict
+    unique_labels = []
+    for key in labels_dict.keys():
+        unique_labels.extend(labels_dict[key])
+
+    unique_labels = list(set(unique_labels))
+    labels2id = {}
+    for i in range(len(unique_labels)):
+        label = unique_labels[i]
+        labels2id[label] = i
+
+    conll_list1 = dataset1.to_conll_list()
+    conll_list2 = dataset2.to_conll_list()
+
+    if len(conll_list1) != len(conll_list2):
+        raise Exception('2 datasets have different size')
+
+    count = 0
+
+    scores_list = []
+    for i in range(len(conll_list1)):
+        labels1 = [word.split(' ')[-1] for word in conll_list1[i]]
+        labels1 = [labels2id[tag] for tag in labels1]
+        labels2 = [word.split(' ')[-1] for word in conll_list2[i]]
+        labels2 = [labels2id[tag] for tag in labels2]
+
+        if len(labels1) != len(labels2):
+            print("{}th sentences is not valid".format(i))
+            count += 1
+            continue
+
+        if len(labels1) == 0:
+            continue
+
+        cohen_score = cohen_kappa_score(np.array(labels1), np.array(labels2))
+        scores_list.append(cohen_score)
+
+    avg_cohen_kappa = sum(scores_list) / len(scores_list)
+
+    return avg_cohen_kappa, count

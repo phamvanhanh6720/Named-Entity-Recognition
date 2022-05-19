@@ -75,9 +75,10 @@ class CustomDataset(Dataset):
         word_list = [word.split(' ')[0] for word in data_point]
         label_list = [word.split(' ')[-1] for word in data_point]
 
-        tokenized_inputs = self.tokenizer(word_list,
+        text = ' '.join(word_list)
+        tokenized_inputs = self.tokenizer(text,
                                           truncation=True,
-                                          is_split_into_words=True,
+                                          is_split_into_words=False,
                                           max_length=self.max_seq_length,
                                           padding='max_length')
         word_ids = tokenized_inputs.word_ids()
@@ -156,10 +157,12 @@ class NERDataModule(LightningDataModule):
     def prepare_dataset(
             merge_sentence: Optional[int],
             val_size: float,
-            test_size:float,
+            test_size: float,
             dataset_path: str,
             output_dir: str,
-            data_format: str):
+            data_format: str,
+            random_state: int = 43
+    ):
 
         dataset_df = None
         if data_format == 'doccano':
@@ -187,7 +190,7 @@ class NERDataModule(LightningDataModule):
 
         df_train, df_rest = train_test_split(dataset_df,
                                              shuffle=True,
-                                             random_state=43,
+                                             random_state=random_state,
                                              stratify=dataset_df[['source']],
                                              train_size=1 - val_size - test_size)
 
@@ -198,9 +201,9 @@ class NERDataModule(LightningDataModule):
                                            train_size=val_size / (val_size + test_size))
 
         # Write to file
-        NERDataModule.write_to_file(df_data=df_train, output_dir=output_dir, filename='train_data.txt')
-        NERDataModule.write_to_file(df_data=df_val, output_dir=output_dir, filename='val_data.txt')
-        NERDataModule.write_to_file(df_data=df_test, output_dir=output_dir, filename='test_data.txt')
+        NERDataModule.write_to_file(df_data=df_train, output_dir=output_dir, filename='train_data_old.txt')
+        NERDataModule.write_to_file(df_data=df_val, output_dir=output_dir, filename='val_data_old.txt')
+        NERDataModule.write_to_file(df_data=df_test, output_dir=output_dir, filename='test_data_old.txt')
 
     @staticmethod
     def write_to_file(df_data, output_dir, filename):
@@ -218,21 +221,21 @@ class NERDataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
 
         self.train_data = CustomDataset(
-            dataset_path=os.path.join('dataset', self.dataset_version, 'train_data.txt'),
+            dataset_path=os.path.join('dataset', self.dataset_version, 'train_data_old.txt'),
             model_name_or_path=self.model_name_or_path,
             tags_list=self.tags_list,
             max_seq_length=self.max_seq_length,
             label_all_tokens=self.label_all_tokens)
 
         self.val_data = CustomDataset(
-            dataset_path=os.path.join('dataset', self.dataset_version, 'val_data.txt'),
+            dataset_path=os.path.join('dataset', self.dataset_version, 'val_data_old.txt'),
             model_name_or_path=self.model_name_or_path,
             tags_list=self.tags_list,
             max_seq_length=self.max_seq_length,
             label_all_tokens=self.label_all_tokens)
 
         self.test_data = CustomDataset(
-            dataset_path=os.path.join('dataset', self.dataset_version, 'test_data.txt'),
+            dataset_path=os.path.join('dataset', self.dataset_version, 'test_data_old.txt'),
             model_name_or_path=self.model_name_or_path,
             tags_list=self.tags_list,
             max_seq_length=self.max_seq_length,
@@ -275,14 +278,17 @@ if __name__ == '__main__':
     # mlflow.pytorch.autolog(log_every_n_epoch=1)
 
     dm = NERDataModule(model_name_or_path='xlm-roberta-base',
-                       dataset_version='version5_dont_merge',
+                       dataset_version='version6_dont_merge',
                        tags_list=tags_list,
                        max_seq_length=128,
                        train_batch_size=32,
                        eval_batch_size=32)
-    dm.prepare_dataset(merge_sentence=None,
-                    val_size=0.2,
-                    test_size=0.1,
-                    dataset_path='origin_dataset/all_data_v5_15t03.csv',
-                    output_dir='dataset/version5_dont_merge',
-                    data_format='csv')
+    dm.prepare_dataset(
+        merge_sentence=None,
+        val_size=0.2,
+        test_size=0.1,
+        dataset_path='origin_dataset/all_data_v6_16t03.csv',
+        output_dir='dataset/version6_dont_merge',
+        data_format='csv',
+        random_state=41
+    )
