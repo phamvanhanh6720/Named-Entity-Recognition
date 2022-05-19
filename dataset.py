@@ -221,21 +221,21 @@ class NERDataModule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
 
         self.train_data = CustomDataset(
-            dataset_path=os.path.join('dataset', self.dataset_version, 'train_data_old.txt'),
+            dataset_path=os.path.join('dataset', self.dataset_version, 'train_data.txt'),
             model_name_or_path=self.model_name_or_path,
             tags_list=self.tags_list,
             max_seq_length=self.max_seq_length,
             label_all_tokens=self.label_all_tokens)
 
         self.val_data = CustomDataset(
-            dataset_path=os.path.join('dataset', self.dataset_version, 'val_data_old.txt'),
+            dataset_path=os.path.join('dataset', self.dataset_version, 'val_data.txt'),
             model_name_or_path=self.model_name_or_path,
             tags_list=self.tags_list,
             max_seq_length=self.max_seq_length,
             label_all_tokens=self.label_all_tokens)
 
         self.test_data = CustomDataset(
-            dataset_path=os.path.join('dataset', self.dataset_version, 'test_data_old.txt'),
+            dataset_path=os.path.join('dataset', self.dataset_version, 'test_data.txt'),
             model_name_or_path=self.model_name_or_path,
             tags_list=self.tags_list,
             max_seq_length=self.max_seq_length,
